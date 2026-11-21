@@ -193,6 +193,31 @@ def load_variant_rows(input_path_str: str) -> list[Variant]:
     return variants
 
 
+@lru_cache(maxsize=128)
+def parse_variant_string(variant_string: str) -> Variant:
+    parts = variant_string.strip().split("-")
+    if len(parts) != 5:
+        raise ValueError(
+            "Variant string must be in the format chr-pos-pos-ref-alt, for example chr20-63413494-63413494-G-A"
+        )
+
+    chrom, start, end, ref, alt = parts
+    if start != end:
+        raise ValueError("This test parser expects start and end to be identical for SNV input")
+
+    return Variant(
+        variant_id=variant_string,
+        chrom=chrom,
+        pos=int(start),
+        ref=ref,
+        alt=alt,
+        metadata={},
+    )
+
+
+
+
+
 def serialize_result(result: Any) -> Any:
     if result is None:
         return None
@@ -268,6 +293,12 @@ def run_pipeline(input_path: Path = DEFAULT_INPUT_PATH, output_path: Path = DEFA
     return output_path
 
 
+def run_single_variant(variant_string: str) -> pd.DataFrame:
+    variant = parse_variant_string(variant_string)
+    result_df = annotate_variants([variant])
+    return result_df
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run variant annotation on a variant list.")
     parser.add_argument(
@@ -282,12 +313,28 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OUTPUT_PATH,
         help="Path to the annotation output file.",
     )
+    parser.add_argument(
+        "--variant",
+        type=str,
+        default=None,
+        help="Annotate a single variant string like chr20-63413494-63413494-G-A.",
+    )
     return parser
 
 
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.variant:
+        result_df = run_single_variant(args.variant)
+        print(result_df.to_string(index=False))
+        return 0
+
+    if not args.input.exists():
+        raise SystemExit(
+            f"Input file not found: {args.input}. Use --variant chr20-63413494-63413494-G-A to test a single variant, or pass --input to a valid file."
+        )
 
     output_path = run_pipeline(args.input, args.output)
     print(f"Annotation file written to: {output_path}")
