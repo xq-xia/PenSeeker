@@ -267,6 +267,7 @@ def annotate_variants(variants: list[Variant], **context: Any) -> pd.DataFrame:
         "transcript_id",
         "protein_change",
     ]
+    
     for column_name, _ in ANNOTATION_COLUMNS:
         extra_columns = EXTRA_RESULT_COLUMNS.get(column_name)
         if extra_columns:
